@@ -109,19 +109,21 @@ def train_model(config: Config, epoch: int, train_loader: DataLoader, dev_loader
         start_time = time.time()
         model.zero_grad()
         model.train()
-        for iter, batch in tqdm(enumerate(train_loader, 1), desc="--training batch", total=len(train_loader)):
-            optimizer.zero_grad()
-            loss = model(words = batch.input_ids.to(config.device), word_seq_lens = batch.word_seq_len.to(config.device),
-                    orig_to_tok_index = batch.orig_to_tok_index.to(config.device), input_mask = batch.attention_mask.to(config.device),
-                    labels = batch.label_ids.to(config.device))
-            epoch_loss += loss.item()
-            loss.backward()
-            if config.max_grad_norm > 0:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
-            optimizer.step()
-            optimizer.zero_grad()
-            scheduler.step()
-            model.zero_grad()
+        with tqdm(enumerate(train_loader, 1), desc="--training batch", total=len(train_loader)) as tepoch:
+            for iter, batch in tepoch:
+                optimizer.zero_grad()
+                loss = model(words = batch.input_ids.to(config.device), word_seq_lens = batch.word_seq_len.to(config.device),
+                        orig_to_tok_index = batch.orig_to_tok_index.to(config.device), input_mask = batch.attention_mask.to(config.device),
+                        labels = batch.label_ids.to(config.device))
+                epoch_loss += loss.item()
+                loss.backward()
+                if config.max_grad_norm > 0:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
+                optimizer.step()
+                optimizer.zero_grad()
+                scheduler.step()
+                model.zero_grad()
+                tepoch.set_postfix(loss=loss.item())
         end_time = time.time()
         print("Epoch %d: %.5f, Time is %.2fs" % (i, epoch_loss, end_time - start_time), flush=True)
 

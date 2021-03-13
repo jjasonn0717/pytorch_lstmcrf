@@ -110,8 +110,10 @@ class TransformersNERDataset(Dataset):
             for line in tqdm(f.readlines()):
                 line = line.rstrip()
                 if line == "":
-                    labels = convert_iobes(labels)
-                    insts.append(Instance(words=words, ori_words=ori_words, labels=labels))
+                    if len(words) > 0:
+                        labels = convert_iobes(labels)
+                        assert len(words) == len(ori_words) and len(words) == len(labels)
+                        insts.append(Instance(words=words, ori_words=ori_words, labels=labels))
                     words = []
                     ori_words = []
                     labels = []

@@ -50,9 +50,12 @@ class Config:
 
         # Data specification
         self.dataset = args.dataset
-        self.train_file = "data/" + self.dataset + "/train.txt"
-        self.dev_file = "data/" + self.dataset + "/dev.txt"
-        self.test_file = "data/" + self.dataset + "/test.txt"
+        #self.train_file = "data/" + self.dataset + "/train.txt"
+        #self.dev_file = "data/" + self.dataset + "/dev.txt"
+        #self.test_file = "data/" + self.dataset + "/test.txt"
+        self.train_file = os.path.join(self.dataset, "train.txt")
+        self.dev_file = os.path.join(self.dataset, "dev.txt")
+        self.test_file = os.path.join(self.dataset, "test.txt")
         self.train_num = args.train_num
         self.dev_num = args.dev_num
         self.test_num = args.test_num
