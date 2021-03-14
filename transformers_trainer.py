@@ -29,6 +29,58 @@ def set_seed(opt, seed):
         torch.cuda.manual_seed_all(seed)
 
 
+class F1Measure:
+    def __init__(self):
+        self._p_dict = Counter()
+        self._total_predict_dict = Counter()
+        self._total_entity_dict = Counter()
+
+    def update(self, batch_p, batch_predict, batch_total):
+        self._p_dict += batch_p
+        self._total_predict_dict += batch_predict
+        self._total_entity_dict += batch_total
+
+    def get_metric(self, print_each_type_metric):
+        if print_each_type_metric:
+            per_type_metrics = {}
+            for key in self._total_entity_dict:
+                precision_key, recall_key, fscore_key = get_metric(
+                    self._p_dict[key], self._total_entity_dict[key], self._total_predict_dict[key]
+                )
+                per_type_metrics[key] = {
+                    "Prec.": precision_key,
+                    "Recl.": recall_key,
+                    "F1": fscore_key
+                }
+        else:
+            per_type_metrics = None
+
+        total_p = sum(list(self._p_dict.values()))
+        total_predict = sum(list(self._total_predict_dict.values()))
+        total_entity = sum(list(self._total_entity_dict.values()))
+        precision, recall, fscore = get_metric(total_p, total_entity, total_predict)
+        total_metrics = {
+            "Prec.": precision,
+            "Recl.": recall,
+            "F1": fscore
+        }
+        return total_metrics, per_type_metrics
+
+
+class Average:
+    def __init__(self):
+        self._total_value = 0.0
+        self._count = 0
+
+    def update(self, value):
+        self._count += 1
+        self._total_value += value
+
+    def get_metric(self):
+        average_value = self._total_value / self._count if self._count > 0 else 0.0
+        return float(average_value)
+
+
 def parse_arguments(parser):
     ###Training Hyperparameters
     parser.add_argument('--device', type=str, default="cpu", choices=['cpu', 'cuda:0', 'cuda:1', 'cuda:2'],
@@ -106,13 +158,15 @@ def train_model(config: Config, epoch: int, train_loader: DataLoader, dev_loader
     print(colored(f"[Train Info] Start training, you have set to stop if performace not increase for {config.max_no_incre} epochs",'red'))
     for i in tqdm(range(1, epoch + 1), desc="Epoch"):
         epoch_loss = 0
+        num_iter = 0
+        f1_metrics = F1Measure()
         start_time = time.time()
         model.zero_grad()
         model.train()
         with tqdm(enumerate(train_loader, 1), desc="--training batch", total=len(train_loader)) as tepoch:
             for iter, batch in tepoch:
                 optimizer.zero_grad()
-                loss = model(words = batch.input_ids.to(config.device), word_seq_lens = batch.word_seq_len.to(config.device),
+                loss, batch_max_scores, batch_max_ids = model(words = batch.input_ids.to(config.device), word_seq_lens = batch.word_seq_len.to(config.device),
                         orig_to_tok_index = batch.orig_to_tok_index.to(config.device), input_mask = batch.attention_mask.to(config.device),
                         labels = batch.label_ids.to(config.device))
                 epoch_loss += loss.item()
@@ -123,9 +177,16 @@ def train_model(config: Config, epoch: int, train_loader: DataLoader, dev_loader
                 optimizer.zero_grad()
                 scheduler.step()
                 model.zero_grad()
-                tepoch.set_postfix(loss=loss.item())
+                batch_p , batch_predict, batch_total = evaluate_batch_insts(None,
+                                                                            batch_max_ids.detach(),
+                                                                            batch.label_ids.detach(),
+                                                                            batch.word_seq_len.detach(),
+                                                                            config.idx2labels)
+                f1_metrics.update(batch_p, batch_predict, batch_total)
+                num_iter += 1
+                tepoch.set_postfix(loss=epoch_loss/num_iter, **f1_metrics.get_metric(print_each_type_metric=False)[0])
         end_time = time.time()
-        print("Epoch %d: %.5f, Time is %.2fs" % (i, epoch_loss, end_time - start_time), flush=True)
+        print("Epoch %d: %.5f, Time is %.2fs" % (i, epoch_loss / num_iter, end_time - start_time), flush=True)
 
         model.eval()
         dev_metrics = evaluate_model(config, model, dev_loader, "dev", dev_loader.dataset.insts)
@@ -167,29 +228,41 @@ def train_model(config: Config, epoch: int, train_loader: DataLoader, dev_loader
 
 def evaluate_model(config: Config, model: TransformersCRF, data_loader: DataLoader, name: str, insts: List, print_each_type_metric: bool = False):
     ## evaluation
-    p_dict, total_predict_dict, total_entity_dict = Counter(), Counter(), Counter()
+    #p_dict, total_predict_dict, total_entity_dict = Counter(), Counter(), Counter()
+    f1_metrics = F1Measure()
     batch_size = data_loader.batch_size
     with torch.no_grad():
-        for batch_id, batch in tqdm(enumerate(data_loader, 0), desc="--evaluating batch", total=len(data_loader)):
-            one_batch_insts = insts[batch_id * batch_size:(batch_id + 1) * batch_size]
-            batch_max_scores, batch_max_ids = model.decode(words= batch.input_ids.to(config.device),
-                    word_seq_lens = batch.word_seq_len.to(config.device),
-                    orig_to_tok_index = batch.orig_to_tok_index.to(config.device),
-                    input_mask = batch.attention_mask.to(config.device))
-            batch_p , batch_predict, batch_total = evaluate_batch_insts(one_batch_insts, batch_max_ids, batch.label_ids, batch.word_seq_len, config.idx2labels)
-            p_dict += batch_p
-            total_predict_dict += batch_predict
-            total_entity_dict += batch_total
-            batch_id += 1
+        with tqdm(enumerate(data_loader, 0), desc="--evaluating batch", total=len(data_loader)) as teval:
+            for batch_id, batch in teval:
+                one_batch_insts = insts[batch_id * batch_size:(batch_id + 1) * batch_size]
+                batch_max_scores, batch_max_ids = model.decode(words= batch.input_ids.to(config.device),
+                        word_seq_lens = batch.word_seq_len.to(config.device),
+                        orig_to_tok_index = batch.orig_to_tok_index.to(config.device),
+                        input_mask = batch.attention_mask.to(config.device))
+                batch_p , batch_predict, batch_total = evaluate_batch_insts(one_batch_insts, batch_max_ids, batch.label_ids, batch.word_seq_len, config.idx2labels)
+                #p_dict += batch_p
+                #total_predict_dict += batch_predict
+                #total_entity_dict += batch_total
+                f1_metrics.update(batch_p, batch_predict, batch_total)
+                teval.set_postfix(**f1_metrics.get_metric(print_each_type_metric=False)[0])
+                batch_id += 1
+    final_metrics, final_metrics_key = f1_metrics.get_metric(print_each_type_metric)
+    '''
     if print_each_type_metric:
         for key in total_entity_dict:
             precision_key, recall_key, fscore_key = get_metric(p_dict[key], total_entity_dict[key], total_predict_dict[key])
             print(f"[{key}] Prec.: {precision_key:.2f}, Rec.: {recall_key:.2f}, F1: {fscore_key:.2f}")
+    '''
+    if final_metrics_key is not None:
+        for key in final_metrics_key:
+            precision_key, recall_key, fscore_key = final_metrics_key[key]["Prec."], final_metrics_key[key]["Recl."], final_metrics_key[key]["F1"]
+            print(f"[{key}] Prec.: {precision_key:.2f}, Rec.: {recall_key:.2f}, F1: {fscore_key:.2f}")
 
-    total_p = sum(list(p_dict.values()))
-    total_predict = sum(list(total_predict_dict.values()))
-    total_entity = sum(list(total_entity_dict.values()))
-    precision, recall, fscore = get_metric(total_p, total_entity, total_predict)
+    #total_p = sum(list(p_dict.values()))
+    #total_predict = sum(list(total_predict_dict.values()))
+    #total_entity = sum(list(total_entity_dict.values()))
+    #precision, recall, fscore = get_metric(total_p, total_entity, total_predict)
+    precision, recall, fscore = final_metrics["Prec."], final_metrics['Recl.'], final_metrics["F1"]
     print(colored(f"[{name} set Total] Prec.: {precision:.2f}, Rec.: {recall:.2f}, F1: {fscore:.2f}", 'blue'), flush=True)
 
 

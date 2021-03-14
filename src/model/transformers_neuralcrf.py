@@ -56,7 +56,8 @@ class TransformersCRF(nn.Module):
         maskTemp = torch.arange(1, sent_len + 1, dtype=torch.long, device=curr_dev).view(1, sent_len).expand(batch_size, sent_len)
         mask = torch.le(maskTemp, word_seq_lens.view(batch_size, 1).expand(batch_size, sent_len))
         unlabed_score, labeled_score =  self.inferencer(lstm_scores, word_seq_lens, labels, mask)
-        return unlabed_score - labeled_score
+        bestScores, decodeIdx = self.inferencer.decode(lstm_scores, word_seq_lens)
+        return unlabed_score - labeled_score, bestScores, decodeIdx
 
     def decode(self, words: torch.Tensor,
                     word_seq_lens: torch.Tensor,

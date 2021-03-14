@@ -54,7 +54,8 @@ def evaluate_batch_insts(batch_insts: List[Instance],
         prediction = prediction[::-1]
         output = [idx2label[l] for l in output]
         prediction =[idx2label[l] for l in prediction]
-        batch_insts[idx].prediction = prediction
+        if batch_insts is not None:
+            batch_insts[idx].prediction = prediction
         #convert to span
         output_spans = set()
         start = -1
