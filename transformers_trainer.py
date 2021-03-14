@@ -48,8 +48,8 @@ class F1Measure:
                     self._p_dict[key], self._total_entity_dict[key], self._total_predict_dict[key]
                 )
                 per_type_metrics[key] = {
-                    "Prec.": precision_key,
-                    "Recl.": recall_key,
+                    "Prec": precision_key,
+                    "Recl": recall_key,
                     "F1": fscore_key
                 }
         else:
@@ -60,8 +60,8 @@ class F1Measure:
         total_entity = sum(list(self._total_entity_dict.values()))
         precision, recall, fscore = get_metric(total_p, total_entity, total_predict)
         total_metrics = {
-            "Prec.": precision,
-            "Recl.": recall,
+            "Prec": precision,
+            "Recl": recall,
             "F1": fscore
         }
         return total_metrics, per_type_metrics
