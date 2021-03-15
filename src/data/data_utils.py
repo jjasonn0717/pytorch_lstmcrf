@@ -1,4 +1,5 @@
 from typing import List, Dict, Tuple
+import boto3
 from src.data import Instance
 
 B_PREF="B-"
@@ -11,6 +12,11 @@ START_TAG = "<START>"
 STOP_TAG = "<STOP>"
 PAD = "<PAD>"
 UNK = "<UNK>"
+
+DEFAULT_TAGS = ["B-a", "I-a", "S-a", "E-a", "O"]
+
+BUCKET = 'catalog-ds.instacart.com'
+
 
 def convert_iobes(labels: List[str]) -> List[str]:
 	"""
@@ -36,30 +42,53 @@ def convert_iobes(labels: List[str]) -> List[str]:
 	return labels
 
 
-def build_label_idx(insts: List[Instance]) -> Tuple[List[str], Dict[str, int]]:
-	"""
-	Build the mapping from label to index and index to labels.
-	:param insts: list of instances.
-	:return:
-	"""
-	label2idx = {}
-	idx2labels = []
-	label2idx[PAD] = len(label2idx)
-	idx2labels.append(PAD)
-	for inst in insts:
-		for label in inst.labels:
-			if label not in label2idx:
-				idx2labels.append(label)
-				label2idx[label] = len(label2idx)
+def iobes_to_spans(labels):
+    """
+    Converts a sequence of IOBES tags delimiting arguments to an array
+    of argument boundaries.
+    """
+    spans = []
+    start = None
 
-	label2idx[START_TAG] = len(label2idx)
-	idx2labels.append(START_TAG)
-	label2idx[STOP_TAG] = len(label2idx)
-	idx2labels.append(STOP_TAG)
-	label_size = len(label2idx)
-	print("#labels: {}".format(label_size))
-	print("label 2idx: {}".format(label2idx))
-	return idx2labels, label2idx
+    for i, tag in enumerate(labels):
+        if tag[0] == 'S':
+            spans.append([i, i])
+        elif tag[0] == 'B':
+            start = i
+        elif tag[0] == 'E':
+            spans.append([start, i])
+
+    return spans
+
+
+def build_label_idx(insts: List[Instance]) -> Tuple[List[str], Dict[str, int]]:
+    """
+    Build the mapping from label to index and index to labels.
+    :param insts: list of instances.
+    :return:
+    """
+    label2idx = {}
+    idx2labels = []
+    label2idx[PAD] = len(label2idx)
+    idx2labels.append(PAD)
+    for label in DEFAULT_TAGS:
+        if label not in label2idx:
+            idx2labels.append(label)
+            label2idx[label] = len(label2idx)
+    for inst in insts:
+        for label in inst.labels:
+            if label not in label2idx:
+                idx2labels.append(label)
+                label2idx[label] = len(label2idx)
+
+    label2idx[START_TAG] = len(label2idx)
+    idx2labels.append(START_TAG)
+    label2idx[STOP_TAG] = len(label2idx)
+    idx2labels.append(STOP_TAG)
+    label_size = len(label2idx)
+    print("#labels: {}".format(label_size))
+    print("label 2idx: {}".format(label2idx))
+    return idx2labels, label2idx
 
 def check_all_labels_in_dict(insts: List[Instance], label2idx: Dict[str, int]):
 	for inst in insts:
@@ -111,3 +140,33 @@ def check_all_obj_is_None(objs):
 		if obj is not None:
 			return False
 	return [None] * len(objs)
+
+
+def s3_readline(s3_path, bucket=BUCKET):
+    print(f"read file from Bucket: {bucket} - Path: {s3_path}")
+    s3_resource = boto3.resource('s3')
+    obj = s3_resource.Object(bucket, s3_path)
+    file_content = obj.get()['Body']
+    for line in file_content.iter_lines():
+        yield line.decode('utf-8')
+
+
+def s3_readjson(s3_path, bucket=BUCKET):
+    print(f"read json file from Bucket: {bucket} - Path: {s3_path}")
+    s3_resource = boto3.resource('s3')
+    obj = s3_resource.Object(bucket, s3_path)
+    file_content = obj.get()['Body']
+    json_content = json.loads(file_content.read().decode('utf-8'))
+    return json_content
+
+
+def s3_upload_file(file_path, s3_path, bucket=BUCKET):
+    print(f"upload {file_path} to Bucket: {bucket} - Path: {s3_path}")
+    s3_resource = boto3.resource('s3')
+    s3_resource.Bucket(bucket).upload_file(file_path, s3_path)
+
+
+def s3_download_file(s3_path, file_path, bucket=BUCKET):
+    print(f"download file from Bucket: {bucket} - Path: {s3_path} to {file_path}")
+    s3_resource = boto3.resource('s3')
+    s3_resource.Bucket(bucket).download_file(s3_path, file_path)

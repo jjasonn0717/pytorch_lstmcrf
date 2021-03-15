@@ -1,5 +1,6 @@
 import torch
 from typing import List, Tuple, Dict, Any
+import json
 import pickle
 import torch.optim as optim
 
@@ -9,6 +10,7 @@ from transformers import AdamW
 from src.config import Config
 from termcolor import colored
 from src.data import Instance
+from src.data.data_utils import iobes_to_spans
 
 def log_sum_exp_pytorch(vec: torch.Tensor) -> torch.Tensor:
     """
@@ -76,12 +78,23 @@ def get_optimizer(config: Config, model: nn.Module,
 def write_results(filename: str, insts: List[Instance]):
     f = open(filename, 'w', encoding='utf-8')
     for inst in insts:
-        for i in range(len(inst.words)):
-            words = inst.ori_words
-            output = inst.labels
-            prediction = inst.prediction
-            assert len(output) == len(prediction)
-            f.write("{}\t{}\t{}\t{}\n".format(i, words[i], output[i], prediction[i]))
+        words = inst.ori_words
+        attr_words = inst.ori_attr_words
+        output = inst.labels
+        output_spans = iobes_to_spans(output)
+        prediction = inst.prediction
+        prediction_spans = iobes_to_spans(prediction)
+        assert len(output) == len(prediction)
+        #f.write("{}\t{}\t{}\t{}\n".format(i, words[i], attr_words[i], output[i], prediction[i]))
+        obj = {
+            'words': words,
+            'attr_words': attr_words,
+            'output': output,
+            'output_spans': output_spans,
+            'prediction': prediction,
+            'prediction_spans': prediction_spans
+        }
+        f.write(json.dumps(obj))
         f.write("\n")
     f.close()
 

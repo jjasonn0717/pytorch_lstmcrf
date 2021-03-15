@@ -49,13 +49,14 @@ class Config:
         self.add_iobes_constraint = args.add_iobes_constraint
 
         # Data specification
-        self.dataset = args.dataset
+        #self.dataset = args.dataset
         #self.train_file = "data/" + self.dataset + "/train.txt"
         #self.dev_file = "data/" + self.dataset + "/dev.txt"
         #self.test_file = "data/" + self.dataset + "/test.txt"
-        self.train_file = os.path.join(self.dataset, "train.txt")
-        self.dev_file = os.path.join(self.dataset, "dev.txt")
-        self.test_file = os.path.join(self.dataset, "test.txt")
+        self.train_file = args.train_file
+        self.dev_file = args.dev_file
+        self.test_file = args.test_file
+        self.use_s3 = args.use_s3
         self.train_num = args.train_num
         self.dev_num = args.dev_num
         self.test_num = args.test_num

@@ -44,10 +44,10 @@ class TransformersEmbedder(nn.Module):
         :param input_mask: (batch_size x max_wordpiece_len)
         :return:
         """
-        word_rep, _ = self.model(**{"input_ids": word_seq_tensor, "attention_mask": input_mask})
+        word_rep, cls_rep = self.model(**{"input_ids": word_seq_tensor, "attention_mask": input_mask})
         ##exclude the [CLS] and [SEP] token
         # _, _, word_rep = self.model(**{"input_ids": word_seq_tensor, "attention_mask": input_mask})
         # word_rep = torch.cat(word_rep[-4:], dim=2)
         batch_size, _, rep_size = word_rep.size()
         _, max_sent_len = orig_to_token_index.size()
-        return torch.gather(word_rep[:, 1:, :], 1, orig_to_token_index.unsqueeze(-1).expand(batch_size, max_sent_len, rep_size))
+        return torch.gather(word_rep[:, 1:, :], 1, orig_to_token_index.unsqueeze(-1).expand(batch_size, max_sent_len, rep_size)), cls_rep
