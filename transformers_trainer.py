@@ -262,7 +262,7 @@ def evaluate_model(config: Config, model: TransformersCRF, data_loader: DataLoad
     #total_predict = sum(list(total_predict_dict.values()))
     #total_entity = sum(list(total_entity_dict.values()))
     #precision, recall, fscore = get_metric(total_p, total_entity, total_predict)
-    precision, recall, fscore = final_metrics["Prec."], final_metrics['Recl.'], final_metrics["F1"]
+    precision, recall, fscore = final_metrics["Prec"], final_metrics['Recl'], final_metrics["F1"]
     print(colored(f"[{name} set Total] Prec.: {precision:.2f}, Rec.: {recall:.2f}, F1: {fscore:.2f}", 'blue'), flush=True)
 
 
