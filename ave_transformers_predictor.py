@@ -1,11 +1,11 @@
 
 import pickle
 
-from src.model import TransformersCRF
+from src.model import AVETransformersCRF
 import torch
 from termcolor import colored
 from src.config import context_models
-from src.data import TransformersNERDataset
+from src.data import TransformersAVEDataset
 from typing import List, Union, Tuple
 import tarfile
 from torch.utils.data import DataLoader
@@ -13,7 +13,7 @@ from tqdm import tqdm
 import os
 
 
-class TransformersNERPredictor:
+class TransformersAVEPredictor:
 
     def __init__(self, model_archived_file:str,
                  cuda_device: str = "cpu"):
@@ -26,7 +26,7 @@ class TransformersNERPredictor:
         if model_archived_file.endswith("tar.gz"):
             tar = tarfile.open(model_archived_file)
             self.conf = pickle.load(tar.extractfile(tar.getnames()[1])) ## config file
-            self.model = TransformersCRF(self.conf)
+            self.model = AVETransformersCRF(self.conf)
             self.model.load_state_dict(torch.load(tar.extractfile(tar.getnames()[2]), map_location=device)) ## model file
         else:
             folder_name = model_archived_file
@@ -46,16 +46,20 @@ class TransformersNERPredictor:
     def predict(self, sents: List[List[str]], batch_size = -1):
         batch_size = len(sents) if batch_size == -1 else batch_size
 
-        dataset = TransformersNERDataset(file=None, sents=sents, tokenizer=self.tokenizer, label2idx=self.conf.label2idx, is_train=False)
+        dataset = TransformersAVEDataset(file=None, sents=sents, tokenizer=self.tokenizer, label2idx=self.conf.label2idx, is_train=False, use_s3=0)
         loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=1, collate_fn=dataset.collate_fn)
 
         all_predictions = []
         for batch_id, batch in tqdm(enumerate(loader, 0), desc="--evaluating batch", total=len(loader)):
             one_batch_insts = dataset.insts[batch_id * batch_size:(batch_id + 1) * batch_size]
-            batch_max_scores, batch_max_ids = self.model.decode(words= batch.input_ids.to(self.conf.device),
-                    word_seq_lens = batch.word_seq_len.to(self.conf.device),
-                    orig_to_tok_index = batch.orig_to_tok_index.to(self.conf.device),
-                    input_mask = batch.attention_mask.to(self.conf.device))
+            batch_max_scores, batch_max_ids = self.model.decode(words=batch.input_ids.to(config.device),
+                                                                attr_words=batch.attr_input_ids.to(config.device),
+                                                                word_seq_lens=batch.word_seq_len.to(config.device),
+                                                                attr_word_seq_lens=batch.attr_word_seq_len.to(config.device),
+                                                                orig_to_tok_index=batch.orig_to_tok_index.to(config.device),
+                                                                attr_orig_to_tok_index=batch.attr_orig_to_tok_index.to(config.device),
+                                                                input_mask=batch.attention_mask.to(config.device),
+                                                                attr_input_mask=batch.attr_attention_mask.to(config.device))
 
             for idx in range(len(batch_max_ids)):
                 length = batch.word_seq_len[idx]
@@ -72,9 +76,9 @@ if __name__ == '__main__':
         ['I', 'am', 'traveling', 'to', 'Singapore', 'to', 'visit', 'the', 'Merlion', 'Park', '.'],
         ['John', 'cannot', 'come', 'with', 'us', '.']
     ]
-    model_path = "model_files/english_model"
+    model_path = "test_model/model"
     device = "cpu" # cpu, cuda:0, cuda:1
-    ## or model_path = "model_files/english_model.tar.gz"
-    predictor = TransformersNERPredictor(model_path, cuda_device=device)
+    ## or model_path = "test_model/model.tar.gz"
+    predictor = TransformersAVEPredictor(model_path, cuda_device=device)
     prediction = predictor.predict(sents)
     print(prediction)

@@ -95,7 +95,6 @@ class AVETransformersCRF(nn.Module):
                attr_orig_to_tok_index: torch.Tensor,
                input_mask: torch.Tensor,
                attr_input_mask: torch.Tensor,
-               labels: torch.Tensor,
                **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Decode the batch input

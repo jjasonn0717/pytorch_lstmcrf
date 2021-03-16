@@ -258,8 +258,7 @@ def evaluate_model(config: Config, model: AVETransformersCRF, data_loader: DataL
                                                                orig_to_tok_index=batch.orig_to_tok_index.to(config.device),
                                                                attr_orig_to_tok_index=batch.attr_orig_to_tok_index.to(config.device),
                                                                input_mask=batch.attention_mask.to(config.device),
-                                                               attr_input_mask=batch.attr_attention_mask.to(config.device),
-                                                               labels = batch.label_ids.to(config.device))
+                                                               attr_input_mask=batch.attr_attention_mask.to(config.device))
                 batch_p , batch_predict, batch_total = evaluate_batch_insts(one_batch_insts, batch_max_ids, batch.label_ids, batch.word_seq_len, config.idx2labels)
                 #p_dict += batch_p
                 #total_predict_dict += batch_predict
