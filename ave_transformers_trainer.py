@@ -32,17 +32,29 @@ def set_seed(opt, seed):
 
 
 class F1Measure:
-    def __init__(self):
+    def __init__(self, record_by_attr=False):
         self._p_dict = Counter()
         self._total_predict_dict = Counter()
         self._total_entity_dict = Counter()
+        self.record_by_attr = record_by_attr
+        if record_by_attr:
+            self._p_dict_byattr = Counter()
+            self._total_predict_dict_byattr = Counter()
+            self._total_entity_dict_byattr = Counter()
 
-    def update(self, batch_p, batch_predict, batch_total):
+    def update(self, batch_p, batch_predict, batch_total, batch_p_byattr=None, batch_predict_byattr=None, batch_total_byattr=None):
         self._p_dict += batch_p
         self._total_predict_dict += batch_predict
         self._total_entity_dict += batch_total
+        if self.record_by_attr:
+            self._p_dict_byattr += batch_p_byattr
+            self._total_predict_dict_byattr += batch_predict_byattr
+            self._total_entity_dict_byattr += batch_total_byattr
+        else:
+            if batch_p_byattr is not None or batch_predict_byattr is not None or batch_total_byattr is not None:
+                raise ValueError("Not recording by attributes but get by-attr counters")
 
-    def get_metric(self, print_each_type_metric):
+    def get_metric(self, print_each_type_metric, print_each_attr_metric=False):
         if print_each_type_metric:
             per_type_metrics = {}
             for key in self._total_entity_dict:
@@ -57,6 +69,25 @@ class F1Measure:
         else:
             per_type_metrics = None
 
+        if print_each_attr_metric:
+            if not self.record_by_attr:
+                raise ValueError("No attr metric recorded")
+            per_attr_metrics = {}
+            for key in self._total_entity_dict_byattr:
+                precision_key, recall_key, fscore_key = get_metric(
+                    self._p_dict_byattr[key], self._total_entity_dict_byattr[key], self._total_predict_dict_byattr[key]
+                )
+                per_attr_metrics[key] = {
+                    "Prec": precision_key,
+                    "Recl": recall_key,
+                    "F1": fscore_key
+                }
+            assert sum(list(self._p_dict.values())) == sum(list(self._p_dict_byattr.values()))
+            assert sum(list(self._total_predict_dict.values())) == sum(list(self._total_predict_dict_byattr.values()))
+            assert sum(list(self._total_entity_dict.values())) == sum(list(self._total_entity_dict_byattr.values()))
+        else:
+            per_attr_metrics = None
+
         total_p = sum(list(self._p_dict.values()))
         total_predict = sum(list(self._total_predict_dict.values()))
         total_entity = sum(list(self._total_entity_dict.values()))
@@ -66,7 +97,7 @@ class F1Measure:
             "Recl": recall,
             "F1": fscore
         }
-        return total_metrics, per_type_metrics
+        return total_metrics, per_type_metrics, per_attr_metrics
 
 
 class Average:
@@ -190,11 +221,11 @@ def train_model(config: Config, epoch: int, train_loader: DataLoader, dev_loader
                 optimizer.zero_grad()
                 scheduler.step()
                 model.zero_grad()
-                batch_p , batch_predict, batch_total = evaluate_batch_insts(None,
-                                                                            batch_max_ids.detach(),
-                                                                            batch.label_ids.detach(),
-                                                                            batch.word_seq_len.detach(),
-                                                                            config.idx2labels)
+                batch_p, batch_predict, batch_total, _, _, _ = evaluate_batch_insts(None,
+                                                                                    batch_max_ids.detach(),
+                                                                                    batch.label_ids.detach(),
+                                                                                    batch.word_seq_len.detach(),
+                                                                                    config.idx2labels)
                 f1_metrics.update(batch_p, batch_predict, batch_total)
                 num_iter += 1
                 tepoch.set_postfix(loss=epoch_loss/num_iter, **f1_metrics.get_metric(print_each_type_metric=False)[0])
@@ -238,14 +269,15 @@ def train_model(config: Config, epoch: int, train_loader: DataLoader, dev_loader
     print("Final testing.")
     model.load_state_dict(torch.load(model_path))
     model.eval()
-    evaluate_model(config, model, test_loader, "test", test_loader.dataset.insts)
+    evaluate_model(config, model, test_loader, "test", test_loader.dataset.insts, print_each_type_metric=True, print_each_attr_metric=True)
     write_results(res_path, test_loader.dataset.insts)
 
 
-def evaluate_model(config: Config, model: AVETransformersCRF, data_loader: DataLoader, name: str, insts: List, print_each_type_metric: bool = False):
+def evaluate_model(config: Config, model: AVETransformersCRF, data_loader: DataLoader, name: str, insts: List,
+                   print_each_type_metric: bool = False, print_each_attr_metric: bool = False):
     ## evaluation
     #p_dict, total_predict_dict, total_entity_dict = Counter(), Counter(), Counter()
-    f1_metrics = F1Measure()
+    f1_metrics = F1Measure(record_by_attr=True)
     batch_size = data_loader.batch_size
     with torch.no_grad():
         with tqdm(enumerate(data_loader, 0), desc="--evaluating batch", total=len(data_loader)) as teval:
@@ -259,23 +291,27 @@ def evaluate_model(config: Config, model: AVETransformersCRF, data_loader: DataL
                                                                attr_orig_to_tok_index=batch.attr_orig_to_tok_index.to(config.device),
                                                                input_mask=batch.attention_mask.to(config.device),
                                                                attr_input_mask=batch.attr_attention_mask.to(config.device))
-                batch_p , batch_predict, batch_total = evaluate_batch_insts(one_batch_insts, batch_max_ids, batch.label_ids, batch.word_seq_len, config.idx2labels)
+                batch_p, batch_predict, batch_total, batch_p_byattr, batch_predict_byattr, batch_total_byattr = evaluate_batch_insts(one_batch_insts,
+                                                                                                                                     batch_max_ids,
+                                                                                                                                     batch.label_ids,
+                                                                                                                                     batch.word_seq_len,
+                                                                                                                                     config.idx2labels)
                 #p_dict += batch_p
                 #total_predict_dict += batch_predict
                 #total_entity_dict += batch_total
-                f1_metrics.update(batch_p, batch_predict, batch_total)
+                f1_metrics.update(batch_p, batch_predict, batch_total, batch_p_byattr, batch_predict_byattr, batch_total_byattr)
                 teval.set_postfix(**f1_metrics.get_metric(print_each_type_metric=False)[0])
                 batch_id += 1
-    final_metrics, final_metrics_key = f1_metrics.get_metric(print_each_type_metric)
-    '''
-    if print_each_type_metric:
-        for key in total_entity_dict:
-            precision_key, recall_key, fscore_key = get_metric(p_dict[key], total_entity_dict[key], total_predict_dict[key])
-            print(f"[{key}] Prec.: {precision_key:.2f}, Rec.: {recall_key:.2f}, F1: {fscore_key:.2f}")
-    '''
+    final_metrics, final_metrics_key, final_metrics_attrkey = f1_metrics.get_metric(print_each_type_metric, print_each_attr_metric)
     if final_metrics_key is not None:
+        print(colored(f"[{name} set Per Key]", 'blue'), flush=True)
         for key in final_metrics_key:
-            precision_key, recall_key, fscore_key = final_metrics_key[key]["Prec."], final_metrics_key[key]["Recl."], final_metrics_key[key]["F1"]
+            precision_key, recall_key, fscore_key = final_metrics_key[key]["Prec"], final_metrics_key[key]["Recl"], final_metrics_key[key]["F1"]
+            print(f"[{key}] Prec.: {precision_key:.2f}, Rec.: {recall_key:.2f}, F1: {fscore_key:.2f}")
+    if print_each_attr_metric:
+        print(colored(f"[{name} set Per Attribute]", 'blue'), flush=True)
+        for key in final_metrics_attrkey:
+            precision_key, recall_key, fscore_key = final_metrics_attrkey[key]['Prec'], final_metrics_attrkey[key]['Recl'], final_metrics_attrkey[key]['F1']
             print(f"[{key}] Prec.: {precision_key:.2f}, Rec.: {recall_key:.2f}, F1: {fscore_key:.2f}")
 
     #total_p = sum(list(p_dict.values()))

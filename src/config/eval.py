@@ -46,6 +46,11 @@ def evaluate_batch_insts(batch_insts: List[Instance],
     batch_total_entity_dict = defaultdict(int)
     batch_total_predict_dict = defaultdict(int)
 
+    if batch_insts is not None:
+        batch_p_dict_byattr = defaultdict(int)
+        batch_total_entity_dict_byattr = defaultdict(int)
+        batch_total_predict_dict_byattr = defaultdict(int)
+
     word_seq_lens = word_seq_lens.tolist()
     for idx in range(len(batch_pred_ids)):
         length = word_seq_lens[idx]
@@ -56,6 +61,7 @@ def evaluate_batch_insts(batch_insts: List[Instance],
         prediction =[idx2label[l] for l in prediction]
         if batch_insts is not None:
             batch_insts[idx].prediction = prediction
+            attr_str = " ".join(batch_insts[idx].ori_attr_words)
         #convert to span
         output_spans = set()
         start = -1
@@ -66,9 +72,13 @@ def evaluate_batch_insts(batch_insts: List[Instance],
                 end = i
                 output_spans.add(Span(start, end, output[i][2:]))
                 batch_total_entity_dict[output[i][2:]] += 1
+                if batch_insts is not None:
+                    batch_total_entity_dict_byattr[attr_str] += 1
             if output[i].startswith("S-"):
                 output_spans.add(Span(i, i, output[i][2:]))
                 batch_total_entity_dict[output[i][2:]] += 1
+                if batch_insts is not None:
+                    batch_total_entity_dict_byattr[attr_str] += 1
         predict_spans = set()
         start = -1
         for i in range(len(prediction)):
@@ -78,12 +88,22 @@ def evaluate_batch_insts(batch_insts: List[Instance],
                 end = i
                 predict_spans.add(Span(start, end, prediction[i][2:]))
                 batch_total_predict_dict[prediction[i][2:]] += 1
+                if batch_insts is not None:
+                    batch_total_predict_dict_byattr[attr_str] += 1
             if prediction[i].startswith("S-"):
                 predict_spans.add(Span(i, i, prediction[i][2:]))
                 batch_total_predict_dict[prediction[i][2:]] += 1
+                if batch_insts is not None:
+                    batch_total_predict_dict_byattr[attr_str] += 1
 
         correct_spans = predict_spans.intersection(output_spans)
         for span in correct_spans:
             batch_p_dict[span.type] += 1
+            if batch_insts is not None:
+                batch_p_dict_byattr[attr_str] += 1
 
-    return Counter(batch_p_dict), Counter(batch_total_predict_dict), Counter(batch_total_entity_dict)
+    if batch_insts is not None:
+        return Counter(batch_p_dict), Counter(batch_total_predict_dict), Counter(batch_total_entity_dict), Counter(batch_p_dict_byattr), Counter(batch_total_predict_dict_byattr), Counter(batch_total_entity_dict_byattr)
+    else:
+        return Counter(batch_p_dict), Counter(batch_total_predict_dict), Counter(batch_total_entity_dict), None, None, None
+

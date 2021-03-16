@@ -91,6 +91,19 @@ def convert_instances_to_feature_tensors(instances: List[AVEInstance],
     return features
 
 
+def normalize_attribute(attr):
+    if attr == 'size_value':
+        attr = 'value_for_size'
+    elif attr == 'size_uom':
+        attr = 'unit_of_measurement_for_size'
+    elif attr == 'unit_count':
+        attr = 'count_for_unit'
+    elif attr == 'unit_uom':
+        attr = 'unit_of_measurement_for_unit'
+    attr = " ".join(attr.split('_'))
+    return attr
+
+
 class TransformersAVEDataset(Dataset):
 
     def __init__(self, file: str,
@@ -144,6 +157,7 @@ class TransformersAVEDataset(Dataset):
             line_iter = f.readlines()
         else:
             line_iter = s3_readline(file)
+        all_attr_set = set()
         insts = []
         for line in tqdm(line_iter):
             line = line.rstrip()
@@ -154,10 +168,11 @@ class TransformersAVEDataset(Dataset):
             ori_words = line['tokens']
             attr2anns = collections.defaultdict(list)
             for ann in line['annotation']:
-                attr = " ".join(ann['label'][0].split('_'))
+                attr = normalize_attribute(ann['label'][0])
                 if attr == 'ignore':
                     continue
                 attr2anns[attr].append(ann)
+                all_attr_set.add(attr)
             for attr in attr2anns:
                 labels = ['O'] * len(words)
                 attr_words = [tok.text for tok in WORD_TOKENIZER(attr)]
@@ -178,6 +193,8 @@ class TransformersAVEDataset(Dataset):
                 if len(insts) == number:
                     break
         print("number of sentences: {}".format(len(insts)))
+        print("all attributes:")
+        print(repr(list(all_attr_set)))
         if use_s3 == 0:
             f.close()
         return insts
