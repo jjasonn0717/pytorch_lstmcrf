@@ -157,7 +157,7 @@ class TransformersAVEDataset(Dataset):
             line_iter = f.readlines()
         else:
             line_iter = s3_readline(file)
-        all_attr_set = set()
+        all_attr_counter = collections.defaultdict(int)
         insts = []
         for line in tqdm(line_iter):
             line = line.rstrip()
@@ -172,7 +172,7 @@ class TransformersAVEDataset(Dataset):
                 if attr == 'ignore':
                     continue
                 attr2anns[attr].append(ann)
-                all_attr_set.add(attr)
+                all_attr_counter[attr] += 1
             for attr in attr2anns:
                 labels = ['O'] * len(words)
                 attr_words = [tok.text for tok in WORD_TOKENIZER(attr)]
@@ -194,7 +194,7 @@ class TransformersAVEDataset(Dataset):
                     break
         print("number of sentences: {}".format(len(insts)))
         print("all attributes:")
-        print(repr(list(all_attr_set)))
+        print(repr({k: v for k, v in all_attr_counter.items()}))
         if use_s3 == 0:
             f.close()
         return insts
