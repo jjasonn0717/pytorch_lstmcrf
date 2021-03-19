@@ -374,9 +374,10 @@ def main():
                                      collate_fn=test_dataset.collate_fn)
         model = AVETransformersCRF(saved_config)
         model.load_state_dict(torch.load(f"{folder_name}/lstm_crf.m", map_location=device))
+        model.to(device)
         model.eval()
         evaluate_model(config=saved_config, model=model, data_loader=test_dataloader, name="test mode", insts = test_dataset.insts,
-                       print_each_type_metric=False)
+                       print_each_type_metric=True, print_each_attr_metric=True)
 
 
 if __name__ == "__main__":

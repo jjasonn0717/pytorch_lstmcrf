@@ -143,7 +143,12 @@ class TransformersAVEDataset(Dataset):
         """
         insts = []
         for sent, attr in sents:
-            insts.append(Instance(words=sent, ori_words=sent, attr_words=attr))
+            if type(sent) == str:
+                sent = [tok.text for tok in WORD_TOKENIZER(sent)]
+            if type(attr) == str:
+                attr = normalize_attribute(attr)
+                attr = [tok.text for tok in WORD_TOKENIZER(attr)]
+            insts.append(AVEInstance(words=sent, ori_words=sent, attr_words=attr, ori_attr_words=attr))
         return insts
 
 
@@ -168,6 +173,7 @@ class TransformersAVEDataset(Dataset):
             ori_words = line['tokens']
             attr2anns = collections.defaultdict(list)
             for ann in line['annotation']:
+                assert len(ann['label']) == 1
                 attr = normalize_attribute(ann['label'][0])
                 if attr == 'ignore':
                     continue
@@ -178,6 +184,7 @@ class TransformersAVEDataset(Dataset):
                 attr_words = [tok.text for tok in WORD_TOKENIZER(attr)]
                 ori_attr_words = [tok for tok in attr_words]
                 for ann in attr2anns[attr]:
+                    assert len(ann['points']) == 1
                     assert all([l == 'O' for l in labels[ann['points'][0]['tok_start']:ann['points'][0]['tok_end']+1]])
                     value_words = words[ann['points'][0]['tok_start']:ann['points'][0]['tok_end']+1]
                     if len(value_words) == 1:
