@@ -22,7 +22,7 @@ class AVETransformersCRF(nn.Module):
         super(AVETransformersCRF, self).__init__()
         self.embedder = TransformersEmbedder(transformer_model_name=config.embedder_type,
                                              parallel_embedder=config.parallel_embedder,
-                                             freeze=config.freeze_embedder)
+                                             freeze_embedder=config.freeze_embedder)
         if config.hidden_dim > 0:
             assert config.hidden_dim == self.embedder.get_output_dim()
             self.encoder = BiLSTMEncoder(input_dim=self.embedder.get_output_dim(),
