@@ -27,7 +27,9 @@ class TransformersEmbedder(nn.Module):
         but don't forget also exclude the parameters in the optimizer
         """
         if freeze_embedder:
-            self.model.requires_grad = False
+            for param in self.model.parameters():
+                param.requires_grad = False
+            #self.model.requires_grad = False
 
     def get_output_dim(self):
         ## use differnet model may have different attribute

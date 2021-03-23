@@ -177,6 +177,15 @@ def train_model(config: Config, epoch: int, train_loader: DataLoader, dev_loader
     print(colored(f"[Optimizer Info] Modify the optimizer info as you need.", 'red'))
     print(optimizer)
 
+    print(colored("[Optimizer Info] The following parameters are Frozen (without gradient):", 'red'))
+    for name, parameter in model.named_parameters():
+        if not parameter.requires_grad:
+            print(name)
+    print(colored("[Optimizer Info] The following parameters are Tunable (with gradient):", 'red'))
+    for name, parameter in model.named_parameters():
+        if parameter.requires_grad:
+            print(name)
+
     model.to(config.device)
 
     best_dev = [-1, 0]
