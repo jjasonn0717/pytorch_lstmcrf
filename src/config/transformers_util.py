@@ -9,6 +9,7 @@ import torch
 context_models = {
     'bert-base-uncased' : {  "model": BertModel,  "tokenizer" : BertTokenizer },
     'bert-base-cased' : {  "model": BertModel,  "tokenizer" : BertTokenizer },
+    'bert-large-uncased' : {  "model": BertModel,  "tokenizer" : BertTokenizer },
     'bert-large-cased' : {  "model": BertModel,  "tokenizer" : BertTokenizer },
     'openai-gpt': {"model": OpenAIGPTModel, "tokenizer": OpenAIGPTTokenizer},
     'gpt2': {"model": GPT2Model, "tokenizer": GPT2Tokenizer},
