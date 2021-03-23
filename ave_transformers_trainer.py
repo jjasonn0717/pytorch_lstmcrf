@@ -148,6 +148,9 @@ def parse_arguments(parser):
     parser.add_argument('--parallel_embedder', type=int, default=0,
                         choices=[0, 1],
                         help="use parallel training for those (BERT) models in the transformers. Parallel on GPUs")
+    parser.add_argument('--freeze_embedder', type=int, default=0,
+                        choices=[0, 1],
+                        help="freeze the weights of those (BERT) models in the transformers.")
     parser.add_argument('--add_iobes_constraint', type=int, default=0, choices=[0,1], help="add IOBES constraint for transition parameters to enforce valid transitions")
 
     parser.add_argument('--mode', type=str, default="train", choices=["train", "test"], help="training model or test mode")

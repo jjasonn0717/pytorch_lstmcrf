@@ -38,7 +38,7 @@ class TransformersAVEPredictor:
             f = open(folder_name + "/config.conf", 'rb')
             self.conf = pickle.load(f)
             f.close()
-            self.model = TransformersCRF(self.conf)
+            self.model = AVETransformersCRF(self.conf)
             self.model.load_state_dict(torch.load(f"{folder_name}/lstm_crf.m", map_location=device))
         self.conf.device = device
         self.model.to(device)
@@ -85,6 +85,8 @@ class TransformersAVEPredictor:
 
 if __name__ == '__main__':
     sents = [
+        ("vitamin e3 & d2 8% reduced fat milk", "vitamins"),
+        ("vitamim c & d 8% reduced fat milk", "vitamins"),
         ("vitamin a & d & d3 8% reduced fat milk", "vitamins"),
         ("grade a 8% reduced fat milk", "grade_a"),
         ("grade a 8% reduced fat milk", "fat_content"),
@@ -133,6 +135,20 @@ if __name__ == '__main__':
         ("vitamin a, milk fat 2% yogurt", 'fat_content'),
         ("vitamin a, 2% milk fat yogurt", 'taxonomy'),
         ("vitamin a, 2% milk fat yogurt", 'fat_content'),
+        ("vitamin a, 2% milkfat yogurt", 'fat_content'),
+        ("vitamin a, 2% milk-fat yogurt", 'fat_content'),
+        ("vitamin a, 0% milkfat yogurt", 'fat_content'),
+        ("vitamin a, 1% milkfat yogurt", 'fat_content'),
+        ("vitamin a, 3.25% milk fat yogurt", 'fat_content'),
+        ("vitamin a, 3.25%milk fat yogurt", 'fat_content'),
+        ("vitamin a, 3.25%milkfat yogurt", 'fat_content'),
+        ("vitamin a, 3.25 percent milk fat yogurt", 'fat_content'),
+        ("vitamin a, 1.25 percent milk fat yogurt", 'fat_content'),
+        ("vitamin a, 1 1/2% milkfat yogurt", 'fat_content'),
+        ("vitamin a, 1 1/2% reduced fat yogurt", 'fat_content'),
+        ("vitamin a, 3.25% milkfat yogurt", 'fat_content'),
+        ("vitamin a, 3.5% milkfat yogurt", 'fat_content'),
+        ("vitamin a, 3.5% milk fat yogurt", 'fat_content'),
         ("Wonder® Classic White Bread 20 oz. Loaf", "brand"),
         ("Wonder® Classic White Bread 20 oz. Loaf", "size_uom"),
         ("Wonder® Classic White Bread 20 oz. Loaf", "taxonomy"),
@@ -167,21 +183,48 @@ if __name__ == '__main__':
         ("HAAGEN-DAZS Ice Cream, lemon, 14 Fl. Oz. Cup | No GMO Ingredients | No rBST | Gluten Free", "flavour"),
         ("HAAGEN-DAZS Ice Cream, orange, 14 Fl. Oz. Cup | No GMO Ingredients | No rBST | Gluten Free", "flavour"),
         ("HAAGEN-DAZS Ice Cream, strawberry, 14 Fl. Oz. Cup | No GMO Ingredients | No rBST | Gluten Free", "flavour"),
+        ("HAAGEN-DAZS Ice Cream, Lime, 14 Fl. Oz. Cup | No GMO Ingredients | No rBST | Gluten Free", "brand"),
+        ("HAAGEN-DAZS Ice Cream, Lime, 14 Fl. Oz. Cup | No GMO Ingredients | No rBST | Gluten Free", "flavor"),
+        ("HAAGEN-DAZS Ice Cream, Lime, 14 Fl. Oz. Cup | No GMO Ingredients | No rBST | Gluten Free", "taxonomy"),
+        ("HAAGEN-DAZS Ice Cream, Lime, 14 Fl. Oz. Cup | No GMO Ingredients | No rBST | Gluten Free", "gluten_free"),
+        ("HAAGEN-DAZS Ice Cream, Lime, 14 Fl. Oz. Cup | No GMO Ingredients | No rBST | ", "gluten_free"),
+        ("HAAGEN-DAZS Ice Cream, Lime, 14 Fl. Oz. Cup | No GMO Ingredients | No rBST | Gluten Free", "non_gmo"),
+        ("HAAGEN-DAZS Ice Cream, Lime, 14 Fl. Oz. Cup | Non GMO Ingredients | No rBST | Gluten Free", "non_gmo"),
+        ("HAAGEN-DAZS Ice Cream, Lime, 14 Fl. Oz. Cup | No GMO Ingredients | No rBST | ", "non_gmo"),
+        ("HAAGEN-DAZS Ice Cream, Lime, 14 Fl. Oz. Cup | No GMO Ingredients | No rBST | Gluten Free", "rbst_free"),
+        ("HAAGEN-DAZS Ice Cream, Lime, 14 Fl. Oz. Cup | No GMO Ingredients | No rBST | ", "rbst_free"),
+        ("HAAGEN-DAZS Ice Cream, Lime, 14 Fl. Oz. Cup | No GMO Ingredients | rBST free | ", "rbst_free"),
         ("HAAGEN-DAZS lemon milk", "flavour"),
         ("HAAGEN-DAZS lime milk", "flavour"),
         ("HAAGEN-DAZS lemon milk, 14 Fl. Oz. Cup | No GMO Ingredients | No rBST | Gluten Free", "flavor"),
         ("Yellow Peaches, each", "taxonomy"),
         ("Yellow Peaches, each", "flavor"),
         ("Yellow Peaches, each", "color"),
+        ("Oreo Chocolate Sandwich Cookies", "taxonomy"),
+        ("Oreo Chocolate Sandwich Cookies", "brand"),
+        ("Cheetah Chocolate Sandwich Cookies", "brand"),
+        ("Chocolate Sandwich Cookies, Oreo", "brand"),
+        ("Oreo Chocolate Sandwich Cookies", "flavor"),
+        ("Doritos Nacho Flavored Tortilla Chips", "taxonomy"),
+        ("Doritos Nacho Flavored Tortilla Chips", "brand"),
+        ("Boritos Nacho Flavored Tortilla Chips", "brand"),
+        ("Nacho Flavored Doritos Tortilla Chips", "brand"),
+        ("Nacho Flavored Tortilla Chips, Doritos", "brand"),
+        ("Doritos Nacho Flavored Tortilla Chips", "flavor"),
+        ("Cheetos Cheese Flavored Snacks", "brand"),
+        ("Tire Flavored Snacks", "brand"),
     ]
-    if False:#argsuse_s3:
-        s3_path = "slin/catalog/models/ave_model_test/model.tar.gz"
+    if False:#args.use_s3:
+        #s3_path = "slin/catalog/models/ave_model_test/model.tar.gz"
+        s3_path = "slin/catalog/models/ave_model_test_iobeconstraint/model.tar.gz"
         temp_dir = tempfile.mkdtemp(dir='/tmp')
         model_path = os.path.join(temp_dir, os.path.basename(s3_path))
         s3_download_file(s3_path, model_path)
     else:
         #model_path = "test_model/model"
-        model_path = "/tmp/tmpt9rw2w_c/model.tar.gz"
+        #model_path = "/tmp/tmpt9rw2w_c/model.tar.gz"
+        #model_path = "./ave_model_test_iobeconstraint/model"
+        model_path = "/tmp/tmpiw1ftsl_/model.tar.gz"
     device = "cpu" # cpu, cuda:0, cuda:1
     ## or model_path = "test_model/model.tar.gz"
     predictor = TransformersAVEPredictor(model_path, cuda_device=device)

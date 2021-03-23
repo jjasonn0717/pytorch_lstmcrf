@@ -10,7 +10,8 @@ class TransformersEmbedder(nn.Module):
     """
 
     def __init__(self, transformer_model_name: str,
-                 parallel_embedder: bool = False):
+                 parallel_embedder: bool = False,
+                 freeze_embedder: bool = False):
         super(TransformersEmbedder, self).__init__()
         output_hidden_states = False ## to use all hidden states or not
         print(colored(f"[Model Info] Loading pretrained language model {transformer_model_name}", "red"))
@@ -25,7 +26,8 @@ class TransformersEmbedder(nn.Module):
         use the following line if you want to freeze the model, 
         but don't forget also exclude the parameters in the optimizer
         """
-        # self.model.requires_grad = False
+        if freeze_embedder:
+            self.model.requires_grad = False
 
     def get_output_dim(self):
         ## use differnet model may have different attribute
