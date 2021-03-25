@@ -124,6 +124,7 @@ def parse_arguments(parser):
     parser.add_argument('--dev_file', type=str)
     parser.add_argument('--test_file', type=str)
     parser.add_argument('--use_s3', type=int, default=0, choices=[0,1], help="if load files from and save models to s3")
+    parser.add_argument('--wp_level', type=int, default=0, choices=[0,1], help="if do sequence labeling on wordpiece level")
     parser.add_argument('--optimizer', type=str, default="adamw", help="This would be useless if you are working with transformers package")
     parser.add_argument('--learning_rate', type=float, default=2e-5, help="usually we use 0.01 for sgd but 2e-5 working with bert/roberta")
     parser.add_argument('--momentum', type=float, default=0.0)
@@ -347,12 +348,12 @@ def main():
         print(colored(f"[Data Info] Tokenizing the instances using '{conf.embedder_type}' tokenizer", "blue"))
         tokenizer = context_models[conf.embedder_type]["tokenizer"].from_pretrained(conf.embedder_type)
         print(colored(f"[Data Info] Reading dataset from: \n{conf.train_file}\n{conf.dev_file}\n{conf.test_file}", "blue"))
-        train_dataset = TransformersAVEDataset(conf.train_file, tokenizer, number=conf.train_num, is_train=True, use_s3=conf.use_s3)
+        train_dataset = TransformersAVEDataset(conf.train_file, tokenizer, number=conf.train_num, is_train=True, use_s3=conf.use_s3, wp_level=conf.wp_level)
         conf.label2idx = train_dataset.label2idx
         conf.idx2labels = train_dataset.idx2labels
 
-        dev_dataset = TransformersAVEDataset(conf.dev_file, tokenizer, number=conf.dev_num, label2idx=train_dataset.label2idx, is_train=False, use_s3=conf.use_s3)
-        test_dataset = TransformersAVEDataset(conf.test_file, tokenizer, number=conf.test_num, label2idx=train_dataset.label2idx, is_train=False, use_s3=conf.use_s3)
+        dev_dataset = TransformersAVEDataset(conf.dev_file, tokenizer, number=conf.dev_num, label2idx=train_dataset.label2idx, is_train=False, use_s3=conf.use_s3, wp_level=conf.wp_level)
+        test_dataset = TransformersAVEDataset(conf.test_file, tokenizer, number=conf.test_num, label2idx=train_dataset.label2idx, is_train=False, use_s3=conf.use_s3, wp_level=conf.wp_level)
         num_workers = 8
         conf.label_size = len(train_dataset.label2idx)
         train_dataloader = DataLoader(train_dataset, batch_size=conf.batch_size, shuffle=True, num_workers=num_workers,
@@ -381,7 +382,7 @@ def main():
         print(colored(f"[Data Info] Tokenizing the instances using '{saved_config.embedder_type}' tokenizer", "blue"))
         tokenizer = context_models[saved_config.embedder_type]["tokenizer"].from_pretrained(saved_config.embedder_type)
         test_dataset = TransformersAVEDataset(opt.test_file, tokenizer, number=opt.test_num,
-                                              label2idx=saved_config.label2idx, is_train=False, use_s3=opt.use_s3)
+                                              label2idx=saved_config.label2idx, is_train=False, use_s3=opt.use_s3, wp_level=saved_config.wp_level)
         test_dataloader = DataLoader(test_dataset, batch_size=opt.batch_size, shuffle=False, num_workers=1,
                                      collate_fn=test_dataset.collate_fn)
         model = AVETransformersCRF(saved_config)

@@ -50,7 +50,7 @@ class TransformersAVEPredictor:
     def predict(self, sents:  List[Tuple[List[str], List[str]]], batch_size = -1):
         batch_size = len(sents) if batch_size == -1 else batch_size
 
-        dataset = TransformersAVEDataset(file=None, sents=sents, tokenizer=self.tokenizer, label2idx=self.conf.label2idx, is_train=False, use_s3=0)
+        dataset = TransformersAVEDataset(file=None, sents=sents, tokenizer=self.tokenizer, label2idx=self.conf.label2idx, is_train=False, use_s3=0, wp_level=self.conf.wp_level)
         loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=1, collate_fn=dataset.collate_fn)
 
         all_predictions = []
@@ -101,6 +101,8 @@ if __name__ == '__main__':
         ("left field farms™ 0.7% reduced fat milk", "brand"),
         ("grade a reduced fat 16.234% milk", "fat_content"),
         ("grade a reduced fat 16.2% milk", "fat_content"),
+        ("grade a reduced fat 16.2% milk", "lactose_content"),
+        ("grade a reduced fat 16.2% milk", "grass_fed"),
         ("grade a reduced fat 16% milk", "fat_content"),
         ("grade a reduced fat milk", "grade_a"),
         ("grade a reduced fat orange milk", "flavor"),
@@ -230,4 +232,7 @@ if __name__ == '__main__':
     predictor = TransformersAVEPredictor(model_path, cuda_device=device)
     prediction = predictor.predict(sents)
     for p in prediction:
-        print(p)
+        #print(p)
+        print("Product name:", " ".join(p['words']))
+        print(f"{' '.join(p['attr_words'])}:", " ".join(f"[{' '.join(p['words'][s:e+1])}]" for s, e in p['prediction_spans']))
+        print()

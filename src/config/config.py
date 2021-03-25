@@ -58,6 +58,7 @@ class Config:
         self.dev_file = args.dev_file
         self.test_file = args.test_file
         self.use_s3 = args.use_s3
+        self.wp_level = args.wp_level
         self.train_num = args.train_num
         self.dev_num = args.dev_num
         self.test_num = args.test_num
